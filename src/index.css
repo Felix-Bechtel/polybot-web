@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+html, body, #root { height: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
+
+/* iOS safe-area for the bottom tab bar */
+.pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+.pt-safe { padding-top:  max(0.5rem, env(safe-area-inset-top)); }
