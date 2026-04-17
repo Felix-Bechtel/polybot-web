@@ -15,7 +15,7 @@ function defaultState(): DBState {
       cashBalance: STARTING_CASH.toString(),
       allowOverdraft: false,
       commandMode: false,
-      claudeModel: "claude-haiku-4-5",
+      claudeModel: "claude-opus-4-7",
     },
     positions: [],
     transactions: [],
@@ -37,8 +37,13 @@ export const db = {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return defaultState();
       const parsed = JSON.parse(raw) as Partial<DBState>;
+      const settings = { ...defaultState().settings, ...(parsed.settings ?? {}) };
+      // One-time migration: old default → new default.
+      if (settings.claudeModel === "claude-haiku-4-5") {
+        settings.claudeModel = "claude-opus-4-7";
+      }
       return {
-        settings: { ...defaultState().settings, ...(parsed.settings ?? {}) },
+        settings,
         positions: parsed.positions ?? [],
         transactions: parsed.transactions ?? [],
       };

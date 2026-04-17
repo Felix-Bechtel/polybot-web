@@ -32,7 +32,7 @@ export async function askClaude(
 ): Promise<ClaudeReply> {
   const key = getClaudeKey();
   if (!key) throw new Error("Missing Claude API key. Add it in Settings.");
-  const model = opts?.model ?? "claude-haiku-4-5";
+  const model = opts?.model ?? "claude-opus-4-7";
   const body = {
     model,
     max_tokens: opts?.maxTokens ?? 400,
