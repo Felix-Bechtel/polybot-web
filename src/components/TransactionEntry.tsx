@@ -61,7 +61,7 @@ export default function TransactionEntry({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center">
-      <div className="w-full sm:max-w-md bg-slate-900 rounded-t-3xl sm:rounded-3xl p-4 space-y-3 pb-safe">
+      <div className="w-full sm:max-w-md bg-surface rounded-t-3xl sm:rounded-3xl p-4 space-y-3 pb-safe">
         <header className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Record transaction</h2>
           <button onClick={onClose} className="text-slate-400 text-sm">Cancel</button>
@@ -113,11 +113,11 @@ export default function TransactionEntry({
             </span>
           </div>
         )}
-        {error && <div className="text-rose-400 text-sm">{error}</div>}
+        {error && <div className="text-no text-sm">{error}</div>}
 
         {!confirming ? (
           <button onClick={() => setConfirming(true)} disabled={!valid}
-            className="w-full rounded-xl bg-sky-500 disabled:bg-slate-700 py-3 font-medium">
+            className="w-full rounded-xl bg-signal disabled:bg-surface-top py-3 font-medium">
             Review
           </button>
         ) : (
@@ -131,9 +131,9 @@ export default function TransactionEntry({
             </p>
             <div className="flex gap-2">
               <button onClick={() => setConfirming(false)}
-                      className="flex-1 rounded-xl bg-slate-700 py-2">Back</button>
+                      className="flex-1 rounded-xl bg-surface-top py-2">Back</button>
               <button onClick={save}
-                      className="flex-1 rounded-xl bg-emerald-500 py-2 font-medium">Confirm</button>
+                      className="flex-1 rounded-xl bg-yes py-2 font-medium">Confirm</button>
             </div>
           </div>
         )}
@@ -142,7 +142,7 @@ export default function TransactionEntry({
   );
 }
 
-const inputCls = "w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2 text-sm";
+const inputCls = "w-full rounded-xl bg-surface-hi border  px-3 py-2 text-sm";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -156,11 +156,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Segmented({ value, onChange, options }:
   { value: string; onChange: (v: string) => void; options: string[] }) {
   return (
-    <div className="flex rounded-xl bg-slate-800 p-1">
+    <div className="flex rounded-xl bg-surface-hi p-1">
       {options.map((o) => (
         <button key={o} onClick={() => onChange(o)}
           className={`flex-1 rounded-lg py-1.5 text-sm ${
-            value === o ? "bg-sky-500 text-white" : "text-slate-300"
+            value === o ? "bg-signal text-white" : "text-slate-300"
           }`}>{o}</button>
       ))}
     </div>

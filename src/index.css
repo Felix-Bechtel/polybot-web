@@ -4,8 +4,32 @@
 
 :root { color-scheme: dark; }
 html, body, #root { height: 100%; }
-body { -webkit-tap-highlight-color: transparent; }
+body {
+  -webkit-tap-highlight-color: transparent;
+  font-family: "Inter Tight", -apple-system, system-ui, sans-serif;
+  letter-spacing: -0.01em;  /* Stitch: tight tracking for editorial feel */
+  background: #0c1324;
+  color: #F1F5F9;
+}
 
 /* iOS safe-area for the bottom tab bar */
 .pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 .pt-safe { padding-top:  max(0.5rem, env(safe-area-inset-top)); }
+
+/* JetBrains Mono helper — every numerical value uses this per Stitch rules */
+.mono,
+[data-mono] {
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  font-feature-settings: "tnum";
+}
+
+/* Hide scrollbars on horizontal tab strips */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Stitch glassmorphism helper */
+.glass {
+  background-color: rgba(25, 31, 49, 0.80);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}

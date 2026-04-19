@@ -22,13 +22,19 @@ export interface ClaudeMessage {
 export interface ClaudeReply {
   text: string;
   stopReason?: string;
+  usage?: {
+    input: number;
+    output: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+  };
 }
 
 /** Call Claude. Throws on missing key, network, or non-2xx response. */
 export async function askClaude(
   system: string,
   messages: ClaudeMessage[],
-  opts?: { model?: string; maxTokens?: number; signal?: AbortSignal },
+  opts?: { model?: string; maxTokens?: number; signal?: AbortSignal; kind?: "chat" | "alert-enrich" },
 ): Promise<ClaudeReply> {
   const key = getClaudeKey();
   if (!key) throw new Error("Missing Claude API key. Add it in Settings.");
@@ -56,13 +62,38 @@ export async function askClaude(
     });
     if (res.ok) {
       const data = await res.json() as {
-        stop_reason?: string; content?: Array<{ type: string; text?: string }>
+        stop_reason?: string;
+        content?: Array<{ type: string; text?: string }>;
+        usage?: {
+          input_tokens?: number;
+          output_tokens?: number;
+          cache_read_input_tokens?: number;
+          cache_creation_input_tokens?: number;
+        };
       };
       const text = (data.content ?? [])
         .filter((b) => b.type === "text")
         .map((b) => b.text ?? "")
         .join("");
-      return { text, stopReason: data.stop_reason };
+      const usage = {
+        input: data.usage?.input_tokens ?? 0,
+        output: data.usage?.output_tokens ?? 0,
+        cacheRead: data.usage?.cache_read_input_tokens,
+        cacheWrite: data.usage?.cache_creation_input_tokens,
+      };
+      // Persist to local usage tracker (5h rolling window in Settings).
+      try {
+        const { recordUsage } = await import("./usage");
+        recordUsage({
+          kind: opts?.kind ?? "chat",
+          input: usage.input,
+          output: usage.output,
+          cacheRead: usage.cacheRead,
+          cacheWrite: usage.cacheWrite,
+          model,
+        });
+      } catch { /* usage tracking is best-effort */ }
+      return { text, stopReason: data.stop_reason, usage };
     }
     if ((res.status === 429 || res.status >= 500) && attempt <= 3) {
       await new Promise((r) => setTimeout(r, 300 * 2 ** attempt));

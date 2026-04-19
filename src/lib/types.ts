@@ -38,15 +38,56 @@ export interface Transaction {
   notes?: string;
 }
 
+export interface AlertThresholds {
+  socialSpikePct: number;   // e.g. 200 means mentions ≥ 2× baseline
+  priceMovePct: number;     // e.g. 3 means |Δprice| ≥ 3 percentage points
+  volumeSpikePct: number;   // e.g. 150 means vol vs last tick ≥ 2.5×
+  minMentions: number;      // floor so tiny samples don't fire
+}
+
 export interface UserSettings {
   cashBalance: string;           // "1.15" exactly
   allowOverdraft: boolean;
   commandMode: boolean;
   claudeModel: string;
+  alertsEnabled: boolean;        // master on/off for the 10-min polling
+  alertIntervalMs: number;       // default 600000 (10 min)
+  lastCheckedAt: string | null;  // ISO of last completed tick
+  watchlist: string[];           // keywords/entities to monitor
+  thresholds: AlertThresholds;
+  opportunityScan: boolean;      // scan top-volume markets for undervalued candidates
+  priceRiseAlertPct: number;     // % above avg price that triggers a portfolio-sell alert
+  notificationsEnabled: boolean; // system/browser push notifications on new alerts
+}
+
+export type AlertKind =
+  | "signal"        // social + price spike (the original kind)
+  | "opportunity"   // scanner found an undervalued YES/NO candidate
+  | "take-profit"   // user holds a position now priced well above avg
+  | "cut-loss";     // user holds a position that collapsed vs avg
+
+export interface Alert {
+  id: string;
+  createdAt: string;            // ISO
+  kind: AlertKind;
+  marketId: string;
+  marketName: string;
+  outcome: Outcome;
+  action: Side;                 // BUY | SELL
+  priceLimit: string;           // decimal string in [0,1]
+  confidence: number;           // 0..100
+  rationale: string;
+  url?: string;
+  // Sizing — how many shares / dollars the scheduler suggests putting in.
+  // Absent on older alerts; UI should guard for undefined.
+  sizeShares?: string;          // decimal string, rounded 2dp
+  sizeDollars?: string;         // decimal string, rounded 2dp
+  sizeNote?: string;            // short human reason ("25% of $1.15 cash")
 }
 
 export interface DBState {
   settings: UserSettings;
   positions: Position[];
   transactions: Transaction[];
+  alerts: Alert[];
 }

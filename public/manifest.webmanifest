@@ -1,14 +1,17 @@
 {
   "name": "PolyBot",
   "short_name": "PolyBot",
-  "description": "Local Polymarket simulator + Claude chat. Manual entry only.",
-  "start_url": "/",
+  "description": "Personal Polymarket assistant — live search, 10-min alerts, Claude chat.",
+  "id": "/polybot-web/",
+  "start_url": "/polybot-web/",
+  "scope": "/polybot-web/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0ea5e9",
+  "background_color": "#0c1324",
+  "theme_color": "#204dee",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/polybot-web/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/polybot-web/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/polybot-web/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

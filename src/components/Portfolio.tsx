@@ -32,7 +32,7 @@ export default function Portfolio() {
     <div className="p-4 space-y-3">
       <h1 className="text-xl font-semibold">Portfolio</h1>
       {positions.length === 0 ? (
-        <div className="text-slate-400 text-sm p-8 text-center border border-dashed border-slate-800 rounded-2xl">
+        <div className="text-slate-400 text-sm p-8 text-center border border-dashed  rounded-2xl">
           No open positions. Record a BUY from Markets or Chat.
         </div>
       ) : (
@@ -42,20 +42,20 @@ export default function Portfolio() {
             const curPrice = cur ? (p.outcome === "YES" ? cur.yes : cur.no) : p.avgPrice;
             const pnl = D(curPrice).minus(D(p.avgPrice)).mul(D(p.shares));
             return (
-              <li key={p.id} className="rounded-2xl bg-slate-900 p-3 space-y-2">
+              <li key={p.id} className="rounded-2xl bg-surface p-3 space-y-2">
                 <div className="text-sm line-clamp-1">{p.marketName || p.marketId}</div>
                 <div className="flex flex-wrap gap-2 text-xs text-slate-400">
                   <span>{p.outcome} × {parseFloat(p.shares).toFixed(2)}</span>
                   <span>avg {asOdds(p.avgPrice)} · now {asOdds(curPrice)}</span>
-                  <span className={`ml-auto tabular-nums ${pnl.isNegative() ? "text-rose-400" : "text-emerald-400"}`}>
+                  <span className={`ml-auto tabular-nums ${pnl.isNegative() ? "text-no" : "text-yes"}`}>
                     {asUSD(pnl)}
                   </span>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setActive({ position: p, side: "BUY" })}
-                    className="flex-1 rounded-xl bg-slate-800 py-1.5 text-sm">Buy more</button>
+                    className="flex-1 rounded-xl bg-surface-hi py-1.5 text-sm">Buy more</button>
                   <button onClick={() => setActive({ position: p, side: "SELL" })}
-                    className="flex-1 rounded-xl bg-sky-500 py-1.5 text-sm font-medium">Sell</button>
+                    className="flex-1 rounded-xl bg-signal py-1.5 text-sm font-medium">Sell</button>
                 </div>
               </li>
             );

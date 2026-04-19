@@ -3,7 +3,7 @@
 
 import Decimal from "decimal.js";
 import {
-  DBState, Outcome, Position, Side, Transaction, UserSettings,
+  Alert, DBState, Outcome, Position, Side, Transaction, UserSettings,
 } from "./types";
 import { D, STARTING_CASH, round2 } from "./money";
 
@@ -16,9 +16,30 @@ function defaultState(): DBState {
       allowOverdraft: false,
       commandMode: false,
       claudeModel: "claude-opus-4-7",
+      alertsEnabled: false,
+      alertIntervalMs: 10 * 60 * 1000,
+      lastCheckedAt: null,
+      watchlist: [
+        // general
+        "bitcoin", "ethereum", "eggs",
+        // politics (US)
+        "trump", "biden", "harris", "congress", "supreme court", "fed", "recession",
+        // geopolitics
+        "ukraine", "russia", "china", "taiwan", "israel", "iran", "nato", "gaza",
+      ],
+      thresholds: {
+        socialSpikePct: 200,
+        priceMovePct: 3,
+        volumeSpikePct: 150,
+        minMentions: 10,
+      },
+      opportunityScan: true,
+      priceRiseAlertPct: 25,   // for portfolio sell alerts: current ≥ avg × (1 + this/100)
+      notificationsEnabled: true,
     },
     positions: [],
     transactions: [],
+    alerts: [],
   };
 }
 
@@ -46,6 +67,7 @@ export const db = {
         settings,
         positions: parsed.positions ?? [],
         transactions: parsed.transactions ?? [],
+        alerts: parsed.alerts ?? [],
       };
     } catch {
       return defaultState();
@@ -70,6 +92,22 @@ export const db = {
   setSettings(patch: Partial<UserSettings>): void {
     const s = db.load();
     s.settings = { ...s.settings, ...patch };
+    db.save(s);
+  },
+
+  addAlerts(items: Alert[]): void {
+    if (items.length === 0) return;
+    const s = db.load();
+    const seen = new Set(s.alerts.map((a) => a.id));
+    const fresh = items.filter((a) => !seen.has(a.id));
+    if (fresh.length === 0) return;
+    s.alerts = [...fresh, ...s.alerts].slice(0, 200);
+    db.save(s);
+  },
+
+  clearAlerts(): void {
+    const s = db.load();
+    s.alerts = [];
     db.save(s);
   },
 

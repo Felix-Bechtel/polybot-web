@@ -4,4 +4,4 @@ dist/
 *.log
 .env
 .env.local
-coverage/
+tsconfig.tsbuildinfo
