@@ -66,6 +66,25 @@ self.addEventListener("fetch", (event) => {
   })());
 });
 
+// Web Push handler — fired by the Cloudflare Worker when a backend alert
+// arrives. Works when the PWA is closed / iPhone is locked.
+self.addEventListener("push", (event) => {
+  let data = { title: "PolyBot", body: "", url: undefined };
+  if (event.data) {
+    try { data = { ...data, ...event.data.json() }; }
+    catch { data.body = event.data.text(); }
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      tag: "polybot:push",
+      icon: BASE + "icon-192.png",
+      badge: BASE + "icon-192.png",
+      data: { url: data.url },
+    })
+  );
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = event.notification.data && event.notification.data.url;
