@@ -1,0 +1,24 @@
+name = "polybot-push"
+main = "index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Public config — the public VAPID key is meant to be visible, it's baked
+# into browser subscriptions. PWA reads this to subscribe.
+VAPID_PUBLIC_KEY = "BHU7lfi43_azv35lW1qJ3wQPz7vtUYjZ9k8yK0py5zUwWk5PfUZfzgm-H-IRtBMzQm3rlzapdIf1CmG6y0wBtZc"
+VAPID_SUBJECT    = "mailto:darrell.bechtel@gmail.com"
+
+# Reddit uses no auth for the JSON endpoints; nothing else needed.
+# VAPID_PRIVATE_KEY is set via `wrangler secret put VAPID_PRIVATE_KEY`.
+
+# Cron trigger — every 10 minutes, aligned to :00 :10 :20…
+[triggers]
+crons = ["*/10 * * * *"]
+
+# Durable KV namespace for subscriptions + alert dedupe.
+# Create with: wrangler kv:namespace create POLYBOT_KV
+# Then paste the id below.
+[[kv_namespaces]]
+binding = "POLYBOT_KV"
+id = "PLACEHOLDER_FILL_AFTER_NAMESPACE_CREATE"

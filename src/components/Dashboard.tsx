@@ -8,6 +8,7 @@ import {
   isRunning, checkNow, getStatus, onSchedulerChange,
 } from "../lib/scheduler";
 import { normalizePolymarketUrl } from "../lib/polymarket";
+import { fetchLiveBalance, LiveBalance } from "../lib/webpush";
 
 function fmtRel(iso: string | null): string {
   if (!iso) return "never";
@@ -25,6 +26,21 @@ export default function Dashboard({ onOpenMarkets }: { onOpenMarkets: () => void
   const [showEntry, setShowEntry] = useState(false);
   const [query, setQuery] = useState("");
   const [, forceRender] = useState(0);
+  const [liveBalance, setLiveBalance] = useState<LiveBalance | null>(null);
+
+  // Pull live Polymarket balance from the Worker when a wallet is linked.
+  const polyAddr = state.settings.polymarketAddress;
+  useEffect(() => {
+    if (!polyAddr) { setLiveBalance(null); return; }
+    let cancelled = false;
+    const load = async () => {
+      const b = await fetchLiveBalance(polyAddr);
+      if (!cancelled) setLiveBalance(b);
+    };
+    void load();
+    const h = setInterval(() => { void load(); }, 60_000);
+    return () => { cancelled = true; clearInterval(h); };
+  }, [polyAddr]);
 
   useEffect(() => onSchedulerChange(() => forceRender((n) => n + 1)), []);
   useEffect(() => {
@@ -90,6 +106,49 @@ export default function Dashboard({ onOpenMarkets }: { onOpenMarkets: () => void
           </div>
         </div>
       </section>
+
+      {/* Live Polymarket balance — visible only when wallet is linked */}
+      {polyAddr && (
+        <section className="rounded-2xl bg-surface p-5 shadow-ambient">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] uppercase tracking-[0.15em] text-slate-500">
+              🟢 Polymarket balance (live)
+            </div>
+            {liveBalance?.updatedAt && (
+              <div className="mono text-[10px] text-slate-500">
+                {fmtRel(new Date(liveBalance.updatedAt).toISOString())}
+              </div>
+            )}
+          </div>
+          <div className="mono text-3xl font-bold mt-1 tabular-nums">
+            {liveBalance?.value != null
+              ? `$${liveBalance.value.toFixed(2)}`
+              : <span className="text-slate-500 text-lg">—</span>}
+          </div>
+          {liveBalance && liveBalance.positions.length > 0 && (
+            <div className="mt-3 flex items-end justify-between">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Positions</div>
+                <div className="mono text-lg font-semibold">{liveBalance.positions.length}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Total P&L</div>
+                <div className={`mono text-lg font-semibold ${
+                  liveBalance.positions.reduce((s, p) => s + p.cashPnl, 0) >= 0 ? "text-yes" : "text-no"
+                }`}>
+                  {(() => {
+                    const pnl = liveBalance.positions.reduce((s, p) => s + p.cashPnl, 0);
+                    return `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`;
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+          <p className="text-[10px] text-slate-500 mt-3">
+            Polled every 10 min · backend tracks changes · alerts pushed to your phone
+          </p>
+        </section>
+      )}
 
       {/* Alerts control — glass-gradient CTA vibe */}
       <section className="rounded-2xl bg-surface p-5 space-y-4">

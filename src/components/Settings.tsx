@@ -16,6 +16,10 @@ import {
   onUsageChange, fmtK, fmtDuration, UsageWindow, WINDOW_MS,
 } from "../lib/usage";
 import { validPolygonAddress } from "../lib/polymarket-user";
+import {
+  BackendStatus, currentStatus as pushStatus,
+  subscribeToPush, unsubscribeFromPush, triggerTestPush,
+} from "../lib/webpush";
 
 function isStandalone(): boolean {
   // iOS
@@ -44,6 +48,9 @@ export default function Settings() {
   const [cum, setCum] = useState(() => cumulativeTotals());
   const [avg, setAvg] = useState(() => avgPerAlert());
   const [walletDraft, setWalletDraft] = useState(state.settings.polymarketAddress ?? "");
+  const [push, setPush] = useState<BackendStatus | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMsg, setPushMsg] = useState<string | null>(null);
   const hasKey = !!getClaudeKey();
   const running = schedulerRunning();
   const standalone = isStandalone();
@@ -55,6 +62,7 @@ export default function Settings() {
     const t = setInterval(() => { void getDiagnostics().then(setDiag); }, 3000);
     const u = onUsageChange((w) => { setUsage(w); setCum(cumulativeTotals()); setAvg(avgPerAlert()); });
     const tick = setInterval(() => { setUsage(windowSummary()); }, 30_000);
+    void pushStatus().then(setPush);
     return () => { window.removeEventListener("beforeinstallprompt", h); clearInterval(t); clearInterval(tick); u(); };
   }, []);
 
@@ -148,7 +156,16 @@ export default function Settings() {
         <div className="flex gap-2">
           <button
             disabled={!walletDraft.trim() || !validPolygonAddress(walletDraft.trim())}
-            onClick={() => db.setSettings({ polymarketAddress: walletDraft.trim().toLowerCase() })}
+            onClick={async () => {
+              const addr = walletDraft.trim().toLowerCase();
+              db.setSettings({ polymarketAddress: addr });
+              // If push is already on, re-register so the Worker learns this
+              // wallet and starts tracking balance + positions on the next tick.
+              if (push?.subscribed) {
+                const r = await subscribeToPush(state.settings.watchlist, addr);
+                setPush(r);
+              }
+            }}
             className="flex-1 rounded-xl bg-signal py-2 text-sm font-semibold disabled:bg-surface-top disabled:text-slate-500"
           >Save address</button>
           {state.settings.polymarketAddress && (
@@ -326,6 +343,54 @@ export default function Settings() {
             )}
           </div>
         )}
+
+        {/* Background push — server-side cron, works when app is closed */}
+        <div className="rounded-xl bg-signal/10 border border-signal/30 p-3 space-y-2 mt-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold flex items-center gap-2">
+                ☁️ Background alerts
+                {push?.subscribed && (
+                  <span className="text-[9px] bg-yes-bg text-yes px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
+                    on
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-slate-400">
+                A Cloudflare Worker polls every 10 min and pushes to your phone — works with PolyBot closed.
+              </div>
+            </div>
+            <button
+              disabled={pushBusy}
+              onClick={async () => {
+                setPushBusy(true); setPushMsg(null);
+                const r = push?.subscribed
+                  ? await unsubscribeFromPush()
+                  : await subscribeToPush(state.settings.watchlist, state.settings.polymarketAddress);
+                setPush(r);
+                setPushMsg(r.reason ?? null);
+                setPushBusy(false);
+              }}
+              className={`shrink-0 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider ${
+                push?.subscribed ? "bg-surface-hi text-slate-300" : "bg-signal text-white"
+              } disabled:opacity-50`}
+            >{pushBusy ? "…" : push?.subscribed ? "Off" : "Turn on"}</button>
+          </div>
+          {push?.subscribed && (
+            <button
+              onClick={async () => {
+                setPushMsg("Sending…");
+                const r = await triggerTestPush();
+                setPushMsg("sent" in r ? `🔔 Pushed to ${r.sent} device(s)` : `❌ ${r.error}`);
+              }}
+              className="w-full rounded-lg bg-surface-hi py-2 text-xs font-semibold uppercase tracking-wider text-slate-200"
+            >🔔 Send test push from server</button>
+          )}
+          {pushMsg && <div className="text-[11px] text-slate-300">{pushMsg}</div>}
+          {push && !push.supported && (
+            <p className="text-[11px] text-warn">{push.reason}</p>
+          )}
+        </div>
 
         {/* Category chips */}
         <div>
