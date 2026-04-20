@@ -3,7 +3,7 @@
 
 import Decimal from "decimal.js";
 import {
-  Alert, DBState, Outcome, Position, Side, Transaction, UserSettings,
+  Alert, DBState, Outcome, PendingOrder, Position, Side, Transaction, UserSettings,
 } from "./types";
 import { D, STARTING_CASH, round2 } from "./money";
 
@@ -40,6 +40,7 @@ function defaultState(): DBState {
     positions: [],
     transactions: [],
     alerts: [],
+    pendingOrders: [],
   };
 }
 
@@ -68,6 +69,7 @@ export const db = {
         positions: parsed.positions ?? [],
         transactions: parsed.transactions ?? [],
         alerts: parsed.alerts ?? [],
+        pendingOrders: parsed.pendingOrders ?? [],
       };
     } catch {
       return defaultState();
@@ -220,6 +222,102 @@ export const db = {
     state.transactions.unshift(tx);
     db.save(state);
     return tx;
+  },
+
+  // ── Pending / open orders ─────────────────────────────────────────────
+  placeOrder(input: {
+    marketId: string; marketName: string; outcome: Outcome; side: Side;
+    limitPrice: Decimal; shares: Decimal; notes?: string; url?: string;
+  }): PendingOrder {
+    validate(input.shares, input.limitPrice);
+    const now = new Date().toISOString();
+    const order: PendingOrder = {
+      id: uuid(),
+      marketId: input.marketId,
+      marketName: input.marketName,
+      outcome: input.outcome,
+      side: input.side,
+      limitPrice: input.limitPrice.toString(),
+      shares: input.shares.toString(),
+      filledShares: "0",
+      status: "open",
+      placedAt: now,
+      updatedAt: now,
+      notes: input.notes,
+      url: input.url,
+    };
+    const state = db.load();
+    state.pendingOrders.unshift(order);
+    db.save(state);
+    return order;
+  },
+
+  /** Record a fill against a pending order. Pass `fillShares` = "all" or a
+   * Decimal. Auto-creates a Transaction via recordBuy/Sell and flips status. */
+  fillOrder(orderId: string, fillShares: "all" | Decimal, fillPrice?: Decimal): PendingOrder {
+    const state = db.load();
+    const order = state.pendingOrders.find((o) => o.id === orderId);
+    if (!order) throw new Error("Order not found");
+    if (order.status === "filled" || order.status === "cancelled") {
+      throw new Error(`Order is ${order.status}`);
+    }
+    const remaining = D(order.shares).minus(D(order.filledShares));
+    const amount = fillShares === "all" ? remaining : fillShares;
+    if (amount.lessThanOrEqualTo(0)) throw new Error("fill size must be > 0");
+    if (amount.greaterThan(remaining)) {
+      throw new Error(`Can only fill up to ${remaining.toString()} more shares`);
+    }
+    const price = fillPrice ?? D(order.limitPrice);
+
+    // Create a real transaction.
+    if (order.side === "BUY") {
+      db.recordBuy({
+        marketId: order.marketId, marketName: order.marketName,
+        outcome: order.outcome, shares: amount, price,
+        notes: `Fill of order ${order.id.slice(0, 8)}${order.notes ? ` — ${order.notes}` : ""}`,
+      });
+    } else {
+      db.recordSell({
+        marketId: order.marketId, outcome: order.outcome,
+        shares: amount, price,
+        notes: `Fill of order ${order.id.slice(0, 8)}${order.notes ? ` — ${order.notes}` : ""}`,
+      });
+    }
+
+    // Re-load because recordBuy/Sell saved; then update this order's record.
+    const s2 = db.load();
+    const newFilled = D(order.filledShares).plus(amount);
+    const nowIso = new Date().toISOString();
+    const fullyFilled = newFilled.gte(D(order.shares));
+    s2.pendingOrders = s2.pendingOrders.map((o) =>
+      o.id === orderId
+        ? {
+            ...o,
+            filledShares: newFilled.toString(),
+            status: fullyFilled ? "filled" : "partial",
+            updatedAt: nowIso,
+          }
+        : o,
+    );
+    db.save(s2);
+    return s2.pendingOrders.find((o) => o.id === orderId)!;
+  },
+
+  cancelOrder(orderId: string): void {
+    const state = db.load();
+    const now = new Date().toISOString();
+    state.pendingOrders = state.pendingOrders.map((o) =>
+      o.id === orderId && (o.status === "open" || o.status === "partial")
+        ? { ...o, status: "cancelled", updatedAt: now }
+        : o,
+    );
+    db.save(state);
+  },
+
+  deleteOrder(orderId: string): void {
+    const state = db.load();
+    state.pendingOrders = state.pendingOrders.filter((o) => o.id !== orderId);
+    db.save(state);
   },
 };
 

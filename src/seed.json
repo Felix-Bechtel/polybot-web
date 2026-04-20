@@ -2,18 +2,18 @@
   "markets": [
     { "id": "POLY-PRES-2028", "question": "Will a Democrat win the 2028 US Presidential election?",
       "yesPrice": "0.47", "noPrice": "0.53", "volume24h": "125000",
-      "url": "https://polymarket.com/market/us-pres-2028" },
+      "url": "https://polymarket.com/event/us-pres-2028" },
     { "id": "POLY-BTC-100K",  "question": "Will BTC close above $100k by year-end?",
       "yesPrice": "0.61", "noPrice": "0.39", "volume24h": "210000",
-      "url": "https://polymarket.com/market/btc-100k-eoy" },
+      "url": "https://polymarket.com/event/btc-100k-eoy" },
     { "id": "POLY-FED-MAY",   "question": "Will the Fed cut rates in May?",
       "yesPrice": "0.28", "noPrice": "0.72", "volume24h": "88000",
-      "url": "https://polymarket.com/market/fed-may-cut" },
+      "url": "https://polymarket.com/event/fed-may-cut" },
     { "id": "POLY-ETH-ETF",   "question": "Ether ETF inflows > $1B this month?",
       "yesPrice": "0.55", "noPrice": "0.45", "volume24h": "45000",
-      "url": "https://polymarket.com/market/eth-etf-1b" },
+      "url": "https://polymarket.com/event/eth-etf-1b" },
     { "id": "POLY-CLIMATE",   "question": "Will the US pass major climate policy in 2026?",
       "yesPrice": "0.19", "noPrice": "0.81", "volume24h": "22000",
-      "url": "https://polymarket.com/market/climate-policy-2026" }
+      "url": "https://polymarket.com/event/climate-policy-2026" }
   ]
 }

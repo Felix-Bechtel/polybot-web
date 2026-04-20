@@ -232,13 +232,22 @@ function parse(m: Record<string, unknown>): Market | null {
   if (!id) return null;
   const [yes, no] = parsePrices(m.outcomePrices ?? m.outcome_prices);
   const vol = String(m.volume24hr ?? m.volume24h ?? m.volume ?? 0);
-  const slug = (m.slug as string | undefined) ?? "";
+  // Polymarket removed /market/<slug> — canonical URL is /event/<event-slug>.
+  // Gamma returns an `events` array on each market with the parent event's slug.
+  const events = (m.events as Array<{ slug?: string }> | undefined) ?? [];
+  const eventSlug = events[0]?.slug;
+  const marketSlug = (m.slug as string | undefined) ?? "";
+  const url = eventSlug
+    ? `https://polymarket.com/event/${eventSlug}`
+    : marketSlug
+      ? `https://polymarket.com/event/${marketSlug}`   // best-effort fallback
+      : undefined;
   return {
     id: String(id),
     question: (m.question as string) ?? (m.title as string) ?? "",
     yesPrice: yes, noPrice: no,
     volume24h: vol,
-    url: slug ? `https://polymarket.com/market/${slug}` : undefined,
+    url,
   };
 }
 

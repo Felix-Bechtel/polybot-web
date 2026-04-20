@@ -85,9 +85,32 @@ export interface Alert {
   sizeNote?: string;            // short human reason ("25% of $1.15 cash")
 }
 
+export type OrderStatus = "open" | "partial" | "filled" | "cancelled";
+
+/** Mirrors a Polymarket limit order. We don't place anything — Felix sets the
+ * limit manually in PolyBot when he places one on Polymarket, then marks fills
+ * as they happen. `filledShares` reaches `shares` ⇒ status auto-flips to
+ * "filled" and a real Transaction is recorded. */
+export interface PendingOrder {
+  id: string;
+  marketId: string;
+  marketName: string;
+  outcome: Outcome;
+  side: Side;                    // BUY | SELL
+  limitPrice: string;            // decimal string in [0,1]
+  shares: string;                // requested size
+  filledShares: string;          // filled so far (default "0")
+  status: OrderStatus;
+  placedAt: string;              // ISO
+  updatedAt: string;             // ISO
+  notes?: string;
+  url?: string;                  // deep link to the Polymarket event
+}
+
 export interface DBState {
   settings: UserSettings;
   positions: Position[];
   transactions: Transaction[];
   alerts: Alert[];
+  pendingOrders: PendingOrder[];
 }
