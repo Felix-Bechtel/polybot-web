@@ -232,15 +232,17 @@ function parse(m: Record<string, unknown>): Market | null {
   if (!id) return null;
   const [yes, no] = parsePrices(m.outcomePrices ?? m.outcome_prices);
   const vol = String(m.volume24hr ?? m.volume24h ?? m.volume ?? 0);
-  // Polymarket removed /market/<slug> — canonical URL is /event/<event-slug>.
-  // Gamma returns an `events` array on each market with the parent event's slug.
+  // Polymarket canonical URL is /event/<event-slug>. Market slugs (e.g.
+  // "…-april-18-2026") are NOT valid event slugs and 404, so we only use the
+  // event-level slug from Gamma. When it's missing we fall back to the search
+  // page with the question's keywords — always resolves.
   const events = (m.events as Array<{ slug?: string }> | undefined) ?? [];
   const eventSlug = events[0]?.slug;
-  const marketSlug = (m.slug as string | undefined) ?? "";
+  const question = (m.question as string) ?? (m.title as string) ?? "";
   const url = eventSlug
     ? `https://polymarket.com/event/${eventSlug}`
-    : marketSlug
-      ? `https://polymarket.com/event/${marketSlug}`   // best-effort fallback
+    : question
+      ? `https://polymarket.com/markets?q=${encodeURIComponent(question.slice(0, 80))}`
       : undefined;
   return {
     id: String(id),
@@ -257,21 +259,41 @@ export function seedMarkets(): Market[] {
   return s.markets;
 }
 
-/** Rewrite any old `/market/<slug>` URL to the working `/event/<slug>` form.
- * Applies to historical alerts/transactions that were stored before the URL
- * fix landed, so every link renders correctly without a migration pass. */
+/** Convert ANY Polymarket URL into one that's guaranteed to resolve.
+ *
+ * Polymarket has two URL families:
+ *   • /event/<event-slug>  — always resolves to a real page
+ *   • /market/<market-slug> — LEGACY, often 404s because the market slug
+ *     (e.g. "…-april-18-2026") is NOT a valid event slug
+ *
+ * Old Alerts/Transactions in localStorage still carry /market/ URLs we
+ * generated before the fix landed. Rather than migrating data, this helper
+ * rewrites them at render time:
+ *   • Already /event/<slug>  → unchanged
+ *   • /market/<slug> or /markets/<slug> → Polymarket search with the slug
+ *     terms as query, which reliably lands on the right market
+ */
 export function normalizePolymarketUrl(url: string | undefined): string | undefined {
   if (!url) return url;
   try {
     const u = new URL(url);
-    if (u.hostname === "polymarket.com" && u.pathname.startsWith("/market/")) {
-      u.pathname = "/event/" + u.pathname.slice("/market/".length);
-      return u.toString();
+    if (u.hostname !== "polymarket.com") return url;
+
+    const path = u.pathname;
+    if (path.startsWith("/event/")) return url;                  // already correct
+
+    if (path.startsWith("/market/") || path.startsWith("/markets/")) {
+      const slug = path.replace(/^\/markets?\//, "").replace(/\/$/, "");
+      if (!slug) return "https://polymarket.com/";
+      // Slugs are hyphen-joined words. Drop trailing ISO-ish date segments
+      // ("-april-18-2026", "-2026-04-18") so search picks the stable part.
+      const cleaned = slug
+        .replace(/-\d{4}-\d{2}-\d{2}$/, "")
+        .replace(/-(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*-\d{1,2}-\d{4}$/i, "");
+      const terms = cleaned.split(/[-_]/).filter(Boolean).join(" ");
+      return `https://polymarket.com/markets?q=${encodeURIComponent(terms)}`;
     }
-    if (u.hostname === "polymarket.com" && u.pathname.startsWith("/markets/")) {
-      u.pathname = "/event/" + u.pathname.slice("/markets/".length);
-      return u.toString();
-    }
+
     return url;
   } catch {
     return url;

@@ -37,21 +37,25 @@ describe("suggestPosition", () => {
 });
 
 describe("normalizePolymarketUrl", () => {
-  it("rewrites /market/<slug> → /event/<slug>", () => {
-    expect(normalizePolymarketUrl("https://polymarket.com/market/foo-bar"))
-      .toBe("https://polymarket.com/event/foo-bar");
+  it("rewrites /market/<slug> → /markets?q=<terms>", () => {
+    const r = normalizePolymarketUrl("https://polymarket.com/market/foo-bar");
+    expect(r).toBe("https://polymarket.com/markets?q=foo%20bar");
   });
-  it("rewrites /markets/<slug> → /event/<slug>", () => {
+  it("strips trailing ISO date from market slug before search", () => {
+    const r = normalizePolymarketUrl("https://polymarket.com/market/ceasefire-2026-04-18");
+    expect(r).toBe("https://polymarket.com/markets?q=ceasefire");
+  });
+  it("strips trailing month-day-year suffix from market slug", () => {
+    const r = normalizePolymarketUrl("https://polymarket.com/market/ceasefire-april-18-2026");
+    expect(r).toBe("https://polymarket.com/markets?q=ceasefire");
+  });
+  it("rewrites /markets/<slug> → /markets?q=<terms>", () => {
     expect(normalizePolymarketUrl("https://polymarket.com/markets/foo-bar"))
-      .toBe("https://polymarket.com/event/foo-bar");
+      .toBe("https://polymarket.com/markets?q=foo%20bar");
   });
   it("leaves /event/<slug> URLs unchanged", () => {
     const u = "https://polymarket.com/event/foo-bar";
     expect(normalizePolymarketUrl(u)).toBe(u);
-  });
-  it("preserves query strings + hashes on rewrite", () => {
-    expect(normalizePolymarketUrl("https://polymarket.com/market/foo?x=1#y"))
-      .toBe("https://polymarket.com/event/foo?x=1#y");
   });
   it("passes non-Polymarket URLs through", () => {
     const u = "https://example.com/market/foo";
