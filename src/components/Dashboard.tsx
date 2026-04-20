@@ -7,6 +7,7 @@ import {
   start as startScheduler, stop as stopScheduler,
   isRunning, checkNow, getStatus, onSchedulerChange,
 } from "../lib/scheduler";
+import { normalizePolymarketUrl } from "../lib/polymarket";
 
 function fmtRel(iso: string | null): string {
   if (!iso) return "never";
@@ -155,7 +156,7 @@ export default function Dashboard({ onOpenMarkets }: { onOpenMarkets: () => void
               const isBuy = a.action === "BUY";
               return (
                 <li key={a.id}>
-                  <a href={a.url ?? "#"} target="_blank" rel="noreferrer"
+                  <a href={normalizePolymarketUrl(a.url) ?? "#"} target="_blank" rel="noreferrer"
                     className="block rounded-2xl bg-surface p-4 active:bg-surface-hi">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">

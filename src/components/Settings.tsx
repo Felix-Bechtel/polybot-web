@@ -15,6 +15,7 @@ import {
   windowSummary, cumulativeTotals, avgPerAlert, clearUsage,
   onUsageChange, fmtK, fmtDuration, UsageWindow, WINDOW_MS,
 } from "../lib/usage";
+import { validPolygonAddress } from "../lib/polymarket-user";
 
 function isStandalone(): boolean {
   // iOS
@@ -42,6 +43,7 @@ export default function Settings() {
   const [usage, setUsage] = useState<UsageWindow>(() => windowSummary());
   const [cum, setCum] = useState(() => cumulativeTotals());
   const [avg, setAvg] = useState(() => avgPerAlert());
+  const [walletDraft, setWalletDraft] = useState(state.settings.polymarketAddress ?? "");
   const hasKey = !!getClaudeKey();
   const running = schedulerRunning();
   const standalone = isStandalone();
@@ -119,6 +121,49 @@ export default function Settings() {
             onChange={(e) => db.setSettings({ claudeModel: e.target.value })}
             className="rounded-lg bg-surface-hi border  px-2 py-1 text-sm w-56"/>
         </label>
+      </section>
+
+      {/* Polymarket account — live portfolio tracking */}
+      <section className="rounded-2xl bg-surface p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">🔗 Polymarket account</h2>
+          {state.settings.polymarketAddress && (
+            <span className="text-[10px] bg-yes-bg text-yes px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
+              linked
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-slate-400">
+          Paste your Polymarket <b>proxy wallet address</b> and PolyBot will
+          pull your real on-chain positions + trades every minute. Read-only —
+          no private keys, we never place orders.
+        </p>
+        <input
+          value={walletDraft}
+          onChange={(e) => setWalletDraft(e.target.value)}
+          placeholder="0x…"
+          spellCheck={false}
+          className="w-full rounded-xl bg-surface-hi px-3 py-2 text-sm mono outline-none focus:bg-surface-top transition-colors"
+        />
+        <div className="flex gap-2">
+          <button
+            disabled={!walletDraft.trim() || !validPolygonAddress(walletDraft.trim())}
+            onClick={() => db.setSettings({ polymarketAddress: walletDraft.trim().toLowerCase() })}
+            className="flex-1 rounded-xl bg-signal py-2 text-sm font-semibold disabled:bg-surface-top disabled:text-slate-500"
+          >Save address</button>
+          {state.settings.polymarketAddress && (
+            <button
+              onClick={() => { db.setSettings({ polymarketAddress: undefined }); setWalletDraft(""); }}
+              className="flex-1 rounded-xl bg-surface-top py-2 text-sm"
+            >Unlink</button>
+          )}
+        </div>
+        {walletDraft.trim() && !validPolygonAddress(walletDraft.trim()) && (
+          <p className="text-[11px] text-warn">Invalid format — must be 0x followed by 40 hex chars.</p>
+        )}
+        <p className="text-[10px] text-slate-500">
+          Find at polymarket.com → Profile (top-right avatar) → tap your address to copy.
+        </p>
       </section>
 
       {/* Claude token usage — 5h rolling window */}

@@ -256,3 +256,24 @@ export function seedMarkets(): Market[] {
   const s = seed as { markets: Market[] };
   return s.markets;
 }
+
+/** Rewrite any old `/market/<slug>` URL to the working `/event/<slug>` form.
+ * Applies to historical alerts/transactions that were stored before the URL
+ * fix landed, so every link renders correctly without a migration pass. */
+export function normalizePolymarketUrl(url: string | undefined): string | undefined {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    if (u.hostname === "polymarket.com" && u.pathname.startsWith("/market/")) {
+      u.pathname = "/event/" + u.pathname.slice("/market/".length);
+      return u.toString();
+    }
+    if (u.hostname === "polymarket.com" && u.pathname.startsWith("/markets/")) {
+      u.pathname = "/event/" + u.pathname.slice("/markets/".length);
+      return u.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}

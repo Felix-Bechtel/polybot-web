@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { suggestPosition } from "../lib/polymarket";
+import { suggestPosition, normalizePolymarketUrl } from "../lib/polymarket";
+import { validPolygonAddress } from "../lib/polymarket-user";
 
 const mk = (yes: string, vol = "10000") => ({
   id: "x", question: "Q?", yesPrice: yes, noPrice: String(1 - parseFloat(yes)),
@@ -32,5 +33,46 @@ describe("suggestPosition", () => {
     const low = suggestPosition(mk("0.20", "100"));
     const high = suggestPosition(mk("0.20", "10000000"));
     expect(high.confidence).toBeGreaterThan(low.confidence);
+  });
+});
+
+describe("normalizePolymarketUrl", () => {
+  it("rewrites /market/<slug> → /event/<slug>", () => {
+    expect(normalizePolymarketUrl("https://polymarket.com/market/foo-bar"))
+      .toBe("https://polymarket.com/event/foo-bar");
+  });
+  it("rewrites /markets/<slug> → /event/<slug>", () => {
+    expect(normalizePolymarketUrl("https://polymarket.com/markets/foo-bar"))
+      .toBe("https://polymarket.com/event/foo-bar");
+  });
+  it("leaves /event/<slug> URLs unchanged", () => {
+    const u = "https://polymarket.com/event/foo-bar";
+    expect(normalizePolymarketUrl(u)).toBe(u);
+  });
+  it("preserves query strings + hashes on rewrite", () => {
+    expect(normalizePolymarketUrl("https://polymarket.com/market/foo?x=1#y"))
+      .toBe("https://polymarket.com/event/foo?x=1#y");
+  });
+  it("passes non-Polymarket URLs through", () => {
+    const u = "https://example.com/market/foo";
+    expect(normalizePolymarketUrl(u)).toBe(u);
+  });
+  it("handles undefined", () => {
+    expect(normalizePolymarketUrl(undefined)).toBeUndefined();
+  });
+});
+
+describe("validPolygonAddress", () => {
+  it("accepts a well-formed 0x address", () => {
+    expect(validPolygonAddress("0x1234567890AbCdEf1234567890aBcDeF12345678")).toBe(true);
+  });
+  it("rejects wrong length", () => {
+    expect(validPolygonAddress("0x123")).toBe(false);
+  });
+  it("rejects non-hex chars", () => {
+    expect(validPolygonAddress("0xZZZZ567890AbCdEf1234567890aBcDeF12345678")).toBe(false);
+  });
+  it("rejects missing 0x prefix", () => {
+    expect(validPolygonAddress("1234567890AbCdEf1234567890aBcDeF12345678")).toBe(false);
   });
 });

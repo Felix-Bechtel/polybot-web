@@ -58,6 +58,7 @@ export interface UserSettings {
   opportunityScan: boolean;      // scan top-volume markets for undervalued candidates
   priceRiseAlertPct: number;     // % above avg price that triggers a portfolio-sell alert
   notificationsEnabled: boolean; // system/browser push notifications on new alerts
+  polymarketAddress?: string;    // optional proxy-wallet address for live portfolio tracking
 }
 
 export type AlertKind =

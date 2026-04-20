@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useDB } from "../lib/useDB";
 import { db } from "../lib/db";
 import { PendingOrder, Position } from "../lib/types";
-import { fetchMarket } from "../lib/polymarket";
+import { fetchMarket, normalizePolymarketUrl } from "../lib/polymarket";
+import { fetchUserPositions, PolyUserPosition } from "../lib/polymarket-user";
 import { D, asOdds, asUSD, parseUserDecimal } from "../lib/money";
 import TransactionEntry from "./TransactionEntry";
 
@@ -14,6 +15,23 @@ export default function Portfolio() {
   const [active, setActive] = useState<{ position: Position; side: "BUY" | "SELL" } | null>(null);
   const [fillingId, setFillingId] = useState<string | null>(null);
   const [fillInput, setFillInput] = useState("");
+  const [livePositions, setLivePositions] = useState<PolyUserPosition[] | null>(null);
+  const [liveLoading, setLiveLoading] = useState(false);
+
+  // Pull real Polymarket positions if the user has pasted their proxy address.
+  const addr = state.settings.polymarketAddress ?? "";
+  useEffect(() => {
+    if (!addr) { setLivePositions(null); return; }
+    let cancelled = false;
+    const load = async () => {
+      setLiveLoading(true);
+      const positions = await fetchUserPositions(addr);
+      if (!cancelled) { setLivePositions(positions); setLiveLoading(false); }
+    };
+    void load();
+    const h = setInterval(() => { void load(); }, 60_000);
+    return () => { cancelled = true; clearInterval(h); };
+  }, [addr]);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,9 +59,74 @@ export default function Portfolio() {
       <header>
         <h1 className="text-2xl font-extrabold tracking-tight">Portfolio</h1>
         <p className="text-[10px] uppercase tracking-[0.15em] text-slate-500 mt-1">
-          Positions · open orders · recent fills
+          Live Polymarket · local simulation · open orders
         </p>
       </header>
+
+      {/* LIVE POLYMARKET ACCOUNT — only when wallet address is set */}
+      {addr ? (
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">
+              🟢 Live Polymarket account
+            </h2>
+            <span className="mono text-[10px] text-slate-500">
+              {addr.slice(0, 6)}…{addr.slice(-4)}
+            </span>
+          </div>
+          {livePositions === null || liveLoading ? (
+            <div className="text-slate-500 text-sm p-6 text-center rounded-2xl bg-surface">
+              Loading positions…
+            </div>
+          ) : livePositions.length === 0 ? (
+            <div className="text-slate-500 text-sm p-6 text-center rounded-2xl bg-surface">
+              No on-chain positions found for this wallet.
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {livePositions.map((p) => {
+                const up = p.cashPnl >= 0;
+                return (
+                  <li key={p.conditionId} className="rounded-2xl bg-surface p-4">
+                    <a href={p.url ? normalizePolymarketUrl(p.url) : "#"}
+                       target="_blank" rel="noreferrer"
+                       className="block">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider bg-yes-bg text-yes">
+                          {p.outcome}
+                        </span>
+                        <span className={`ml-auto mono text-xs font-semibold ${up ? "text-yes" : "text-no"}`}>
+                          {up ? "+" : ""}${p.cashPnl.toFixed(2)} · {up ? "+" : ""}{p.percentPnl.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="text-sm font-semibold line-clamp-2">{p.eventTitle}</div>
+                      <div className="mt-2 flex gap-3 text-[11px] text-slate-400">
+                        <span className="mono">{p.size.toFixed(2)} sh</span>
+                        <span className="mono">avg ${p.avgPrice.toFixed(3)}</span>
+                        <span className="mono">now ${p.currentPrice.toFixed(3)}</span>
+                      </div>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      ) : (
+        <div className="rounded-2xl bg-surface p-4 space-y-2 border border-signal/30">
+          <div className="text-sm font-semibold flex items-center gap-2">
+            🔗 <span>Track your real Polymarket account</span>
+          </div>
+          <p className="text-[11px] text-slate-400">
+            Paste your Polymarket <b>proxy wallet address</b> in Settings and
+            PolyBot will auto-track your on-chain positions + trades here
+            (read-only, no private keys).
+          </p>
+          <p className="text-[10px] text-slate-500">
+            Find it at polymarket.com → Profile → Copy Address.
+          </p>
+        </div>
+      )}
 
       {/* OPEN ORDERS — first-class section */}
       <section className="space-y-3">
@@ -216,7 +299,7 @@ function OpenOrderCard({
           <div className="text-sm font-semibold line-clamp-2">{order.marketName}</div>
         </div>
         {order.url && (
-          <a href={order.url} target="_blank" rel="noreferrer"
+          <a href={normalizePolymarketUrl(order.url)} target="_blank" rel="noreferrer"
             className="text-[10px] uppercase tracking-wider text-signal-lo shrink-0">↗</a>
         )}
       </div>

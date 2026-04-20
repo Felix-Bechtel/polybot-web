@@ -6,6 +6,7 @@ import { parse as parseCmd, parseStrict, ParsedTrade } from "../lib/parser";
 import { askClaude, getClaudeKey, ClaudeMessage } from "../lib/claude";
 import { Alert } from "../lib/types";
 import { isRunning, start as startScheduler, stop as stopScheduler } from "../lib/scheduler";
+import { normalizePolymarketUrl } from "../lib/polymarket";
 
 interface Msg {
   id: string;
@@ -229,7 +230,7 @@ function Bubble({ msg, onConfirm }: { msg: Msg; onConfirm: (t: ParsedTrade) => v
         )}
         <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</div>
         {msg.alert?.url && (
-          <a href={msg.alert.url} target="_blank" rel="noreferrer"
+          <a href={normalizePolymarketUrl(msg.alert.url)} target="_blank" rel="noreferrer"
             className="mt-3 inline-block text-[11px] font-semibold text-signal-lo uppercase tracking-wider">
             Open on Polymarket ↗
           </a>
