@@ -18,6 +18,8 @@ import { fetchTopMarkets, searchMarkets } from "./polymarket";
 import { askClaude, getClaudeKey } from "./claude";
 import { notifyAlerts, ensureNotificationPermission } from "./notify";
 import { suggestSize } from "./sizer";
+import { fetchUserPositions, fetchUserTrades, PolyUserPosition } from "./polymarket-user";
+import { matchTradesToOrders } from "./order-matcher";
 
 interface Snapshot {
   priceYes: Record<string, string>;   // marketId -> last yesPrice
@@ -307,6 +309,69 @@ async function tick(): Promise<void> {
           });
         }
       } catch { /* per-position failure is non-fatal */ }
+    }
+
+    // Scanner 4: Live Polymarket account (when wallet address is linked).
+    // Detects big swings on the user's real on-chain positions and emits
+    // alerts that deep-link to the Polymarket event page so one tap puts
+    // them on the right market to sell.
+    const wallet = st.settings.polymarketAddress;
+    if (wallet) {
+      try {
+        const live = await fetchUserPositions(wallet);
+        for (const p of live) {
+          // Only alert above a threshold — same cadence as the local scanner.
+          if (Math.abs(p.percentPnl) < 25) continue;
+          const dedupeCid = `live:${p.conditionId}:${Math.floor(p.percentPnl / 10)}`;
+          if (st.alerts.some((a) => a.marketId === dedupeCid)) continue;
+
+          const up = p.percentPnl >= 0;
+          newAlerts.push({
+            id: uuid(),
+            createdAt: new Date().toISOString(),
+            kind: up ? "take-profit" : "cut-loss",
+            marketId: dedupeCid,
+            marketName: p.eventTitle || p.outcome,
+            outcome: p.outcome.toUpperCase() === "NO" ? "NO" : "YES",
+            action: "SELL",
+            priceLimit: clamp01(new Decimal(p.currentPrice).minus(0.01)),
+            confidence: Math.min(95, Math.round(50 + Math.min(40, Math.abs(p.percentPnl) / 2))),
+            rationale:
+              `Live Polymarket: ${up ? "+" : ""}${p.percentPnl.toFixed(0)}% · ` +
+              `$${p.cashPnl >= 0 ? "+" : ""}${p.cashPnl.toFixed(2)} on ${p.size.toFixed(2)} sh`,
+            url: p.url,
+          });
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    // Scanner 5: Auto-fill PolyBot pending orders from on-chain /trades.
+    // Matches trades we just discovered against our open orders so the user
+    // doesn't have to manually mark them filled after executing on Polymarket.
+    if (wallet && st.pendingOrders.some((o) => o.status === "open" || o.status === "partial")) {
+      try {
+        const trades = await fetchUserTrades(wallet, 200);
+        const matches = matchTradesToOrders(st.pendingOrders, trades);
+        for (const m of matches) {
+          try {
+            db.fillOrder(m.orderId, m.fillShares, m.fillPrice);
+          } catch (e) { console.warn("auto-fill failed", e); }
+        }
+        if (matches.length > 0) {
+          newAlerts.push({
+            id: uuid(),
+            createdAt: new Date().toISOString(),
+            kind: "signal",
+            marketId: "auto-fill",
+            marketName: `${matches.length} pending order${matches.length === 1 ? "" : "s"} auto-filled`,
+            outcome: "YES",
+            action: "BUY",
+            priceLimit: "0",
+            confidence: 100,
+            rationale: `Matched against your on-chain trades. Check Positions for updated state.`,
+          });
+        }
+      } catch { /* non-fatal */ }
     }
 
     // Annotate every alert with a suggested share count + dollar amount so

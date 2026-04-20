@@ -221,9 +221,12 @@ async function accountTracker(env: Env): Promise<void> {
 }
 
 async function trackAccount(env: Env, addr: string, sub: PushSubscriptionJSON): Promise<void> {
-  const [valueArr, positions] = await Promise.all([
+  // Pull value, positions, and recent activity (last 60 min) in parallel.
+  const since = Math.floor((Date.now() - 60 * 60 * 1000) / 1000);
+  const [valueArr, positions, activity] = await Promise.all([
     fetchJSON<Array<{ user: string; value: number }>>(`https://data-api.polymarket.com/value?user=${addr}`),
     fetchJSON<Array<Record<string, unknown>>>(`https://data-api.polymarket.com/positions?user=${addr}&sizeThreshold=0.01`),
+    fetchJSON<Array<Record<string, unknown>>>(`https://data-api.polymarket.com/activity?user=${addr}&limit=50&start=${since}`),
   ]);
   const liveValue = valueArr?.[0]?.value ?? 0;
 
@@ -321,6 +324,33 @@ async function trackAccount(env: Env, addr: string, sub: PushSubscriptionJSON): 
       url: p.url,
       dedupeKey: `pnl:${addr}:${cid}:${dedupeBucket}`,
     });
+  }
+
+  // 5) Activity-based alerts — redemptions (resolved YES pays out $1/share),
+  //    rewards (liquidity mining income), and conversions. These aren't
+  //    caught by the position-delta scanners above because a redemption
+  //    zeroes the position AND zeros out the cash (it converts to USDC).
+  for (const a of activity ?? []) {
+    const type = String(a.type ?? "").toUpperCase();
+    if (!["REDEEM", "REWARD"].includes(type)) continue;
+    const txHash = String(a.transactionHash ?? a.hash ?? "");
+    if (!txHash) continue;
+    const amount = Number(a.size ?? a.amount ?? 0);
+    const title = String(a.title ?? a.eventTitle ?? a.marketName ?? "Polymarket activity");
+
+    if (type === "REDEEM") {
+      alerts.push({
+        title: `🏆 Resolved · +$${amount.toFixed(2)}`,
+        body: `${truncate(title, 60)} paid out.`,
+        dedupeKey: `activity:${txHash}`,
+      });
+    } else if (type === "REWARD") {
+      alerts.push({
+        title: `🎁 Reward · +$${amount.toFixed(2)}`,
+        body: `Liquidity reward on ${truncate(title, 40)}`,
+        dedupeKey: `activity:${txHash}`,
+      });
+    }
   }
 
   const novel = await dedupeAlerts(env, alerts);
